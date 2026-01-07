@@ -1,0 +1,117 @@
+//@version=5
+strategy(title = "RSI / RSI2 / Stoch RSI Strategy Tester",overlay = true)
+
+//━━━━━━━━━━━━━━━━━━━
+// RSI 1
+//━━━━━━━━━━━━━━━━━━━
+useRSI1   = input.bool(true,  "Activer RSI 1")
+rsi1Len   = input.int(14, "RSI 1 Length")
+rsi1OB    = input.int(70, "RSI 1 Overbought")
+rsi1OS    = input.int(30, "RSI 1 Oversold")
+rsi1      = ta.rsi(close, rsi1Len)
+
+
+//━━━━━━━━━━━━━━━━━━━
+// RSI 2
+//━━━━━━━━━━━━━━━━━━━
+useRSI2   = input.bool(false, "Activer RSI 2")
+rsi2Len   = input.int(21, "RSI 2 Length")
+rsi2OB    = input.int(65, "RSI 2 Overbought")
+rsi2OS    = input.int(35, "RSI 2 Oversold")
+rsi2      = ta.rsi(close, rsi2Len)
+
+
+//━━━━━━━━━━━━━━━━━━━
+// STOCH RSI
+//━━━━━━━━━━━━━━━━━━━
+useStoch  = input.bool(false,  "Activer Stoch RSI")
+stochLen  = input.int(14, "Stoch RSI Length")
+kSmooth   = input.int(3, "K Smoothing")
+dSmooth   = input.int(3, "D Smoothing")
+
+stochRSI  = ta.stoch(rsi1, rsi1, rsi1, stochLen)
+k         = ta.sma(stochRSI, kSmooth)
+d         = ta.sma(k, dSmooth)
+
+
+//━━━━━━━━━━━━━━━━━━━
+// CONDITIONS INDIVIDUELLES
+//━━━━━━━━━━━━━━━━━━━
+longRSI1  = ta.crossover(rsi1, rsi1OB)
+shortRSI1 = ta.crossunder(rsi1, rsi1OB)
+
+longRSI2  = ta.crossover(rsi2, rsi2OB)
+shortRSI2 = ta.crossunder(rsi2, rsi2OB)
+
+longStoch  = ta.crossover(k, d)
+shortStoch = ta.crossunder(k, d)
+
+
+//━━━━━━━━━━━━━━━━━━━
+// CONDITIONS COMBINEES
+//━━━━━━━━━━━━━━━━━━━
+//LONG
+longCondition100 = (useRSI1 and not useRSI2 and not useStoch) and (longRSI1)
+longCondition010 = (not useRSI1 and useRSI2 and not useStoch) and (longRSI2)
+longCondition001 = (not useRSI1 and not useRSI2 and useStoch) and (longStoch)
+
+longCondition101 = (useRSI1 and not useRSI2 and useStoch) and (longRSI1 and useStoch)
+longCondition110 = (useRSI1 and useRSI2 and not useStoch) and (longRSI1 and longRSI2)
+longCondition011 = (not useRSI1 and useRSI2 and useStoch) and (longRSI2 and useStoch)
+
+longCondition111 = (useRSI1 and useRSI2 and useStoch) and (longRSI1 and longRSI2 and longStoch)
+
+
+//SHORT
+shortCondition100 = (useRSI1 and not useRSI2 and not useStoch) and (shortRSI1)
+shortCondition010 = (not useRSI1 and useRSI2 and not useStoch) and (shortRSI2)
+shortCondition001 = (not useRSI1 and not useRSI2 and useStoch) and (shortStoch)
+
+shortCondition101 = (useRSI1 and not useRSI2 and useStoch) and (shortRSI1 and useStoch)
+shortCondition110 = (useRSI1 and useRSI2 and not useStoch) and (shortRSI1 and shortRSI2)
+shortCondition011 = (not useRSI1 and useRSI2 and useStoch) and (shortRSI2 and useStoch)
+
+shortCondition111 = (useRSI1 and useRSI2 and useStoch) and (shortRSI1 and shortRSI2 and shortStoch)
+
+
+//━━━━━━━━━━━━━━━━━━━
+// ENTREES
+//━━━━━━━━━━━━━━━━━━━
+if (longCondition100 or longCondition010 or longCondition001) or (longCondition101 or longCondition110 or longCondition011) or longCondition111
+    strategy.entry("Long", strategy.long)
+
+
+if (shortCondition100 or shortCondition010 or shortCondition001) or (shortCondition101 or shortCondition110 or shortCondition011) or shortCondition111
+    strategy.entry("Short", strategy.short)
+
+
+//━━━━━━━━━━━━━━━━━━━
+// TP / SL
+//━━━━━━━━━━━━━━━━━━━
+useTP_SL = input.bool(true, "Utiliser TP / SL")
+slTicks = input.int(20, "Stop Loss (ticks)", minval = 1)
+tpTicks = input.int(40, "Take Profit (ticks)", minval = 1)
+
+
+if useTP_SL and strategy.position_size != 0
+    tick = syminfo.mintick
+    slPrice = slTicks * tick
+    tpPrice = tpTicks * tick
+
+    if strategy.position_size > 0
+        strategy.exit( "Exit Long", from_entry = "Long", stop  = strategy.position_avg_price - slPrice, limit = strategy.position_avg_price + tpPrice )
+    else
+        strategy.exit( "Exit Short", from_entry = "Short", stop  = strategy.position_avg_price + slPrice, limit = strategy.position_avg_price - tpPrice )
+
+
+//━━━━━━━━━━━━━━━━━━━
+// VISUALISATION
+//━━━━━━━━━━━━━━━━━━━
+plot(useRSI1 ? rsi1 : na, "RSI 1", color=color.blue)
+plot(useRSI2 ? rsi2 : na, "RSI 2", color=color.orange)
+
+plot(useStoch ? k : na, "Stoch RSI K", color=color.green)
+plot(useStoch ? d : na, "Stoch RSI D", color=color.red)
+
+hline(70)
+hline(30)
